@@ -1,77 +1,65 @@
-import * as Google from "expo-auth-session/providers/google";
-import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
-
-import { View, Text, TouchableOpacity, StyleSheet, TextInput } from "react-native";
+import {
+  View, Text, TouchableOpacity, StyleSheet,
+  TextInput, ActivityIndicator,
+} from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { useGoogleSignIn } from "@/lib/auth";
 
-// Required for auth flow
-WebBrowser.maybeCompleteAuthSession();
-
-export default function Auth(){
-
+export default function Auth() {
   const router = useRouter();
   const { role } = useLocalSearchParams();
 
   const [showOTP, setShowOTP] = useState(false);
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
+  const [phone,   setPhone]   = useState("");
+  const [otp,     setOtp]     = useState("");
 
-  // ✅ SIMPLE & CLEAN CONFIG (ONLY WEB CLIENT)
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: "653228569188-cbbj98odmm3ahu9pc9e5oo5b08heojpp.apps.googleusercontent.com",
-  });
+  // ── Google sign-in from lib/auth.ts ──────────────────────────
+  const { signIn, loading, error } = useGoogleSignIn();
 
-const sendOTP = () => {
-  if (phone.length < 10) {
-    alert("Enter valid phone number");
-    return;
-  }
-  setShowOTP(true);
-};
-
-const verifyOTP = () => {
-  if (otp === "2005") {
-    handleLogin(); // success
-  } else {
-    alert("Invalid OTP");
-  }
-};
-
-
+  // ── Where to go after successful login ───────────────────────
   const handleLogin = () => {
-    if(role === "patient"){
-      router.replace("/(Patient_tabs)");
-    }else{
+    if (role === "doctor") {
       router.replace("/(Doctor_tabs)");
+    } else {
+      router.replace("/(Patient_tabs)");
     }
   };
 
-  // ✅ HANDLE SUCCESS
-  useEffect(() => {
-    if (response?.type === "success") {
+  // ── OTP (mock) ────────────────────────────────────────────────
+  const verifyOTP = () => {
+    if (otp === "2005") {
       handleLogin();
+    } else {
+      alert("Invalid OTP. Use 2005 for demo.");
     }
-  }, [response]);
+  };
 
-  return(
+  return (
     <View style={styles.container}>
-
       <Text style={styles.title}>Sign In</Text>
-
       <Text style={styles.subtitle}>
-        Continue as {role}
+        Continue as {role ?? "patient"}
       </Text>
 
-      {/* ✅ GOOGLE LOGIN */}
-      <TouchableOpacity 
-        style={styles.googleBtn} 
-        onPress={() => promptAsync()}
+      {/* ── Google Sign-In ── */}
+      <TouchableOpacity
+        style={[styles.googleBtn, loading && { opacity: 0.6 }]}
+        onPress={signIn}          // ← uses useGoogleSignIn from lib/auth.ts
+        disabled={loading}
       >
-        <Text style={styles.btnText}>Sign in with Google </Text>
+        {loading
+          ? <ActivityIndicator color="#fff" />
+          : <Text style={styles.btnText}>Sign in with Google</Text>
+        }
       </TouchableOpacity>
 
-      {/* OTP BUTTON */}
+      {/* error message if login fails */}
+      {error && (
+        <Text style={styles.errorText}>{error}</Text>
+      )}
+
+      {/* ── Phone OTP ── */}
       <TouchableOpacity
         style={styles.phoneBtn}
         onPress={() => setShowOTP(true)}
@@ -79,81 +67,56 @@ const verifyOTP = () => {
         <Text style={styles.btnText}>Sign in with Phone OTP</Text>
       </TouchableOpacity>
 
-      {/* OTP UI */}
       {showOTP && (
         <View style={styles.otpContainer}>
-
           <TextInput
             placeholder="Enter Phone Number"
             style={styles.input}
             value={phone}
             onChangeText={setPhone}
+            keyboardType="phone-pad"
           />
-
           <TextInput
-            placeholder="Enter OTP"
+            placeholder="Enter OTP (demo: 2005)"
             style={styles.input}
             value={otp}
             onChangeText={setOtp}
+            keyboardType="numeric"
           />
-
-          <TouchableOpacity style={styles.googleBtn} onPress={handleLogin}>
+          <TouchableOpacity style={styles.googleBtn} onPress={verifyOTP}>
             <Text style={styles.btnText}>Verify & Continue</Text>
           </TouchableOpacity>
-
         </View>
       )}
-
     </View>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
-  container:{
-    flex:1,
-    justifyContent:"center",
-    alignItems:"center",
-    backgroundColor:"#f4f7fb"
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f4f7fb",
   },
-  title:{
-    fontSize:26,
-    fontWeight:"bold",
-    marginBottom:10
+  title:    { fontSize: 26, fontWeight: "bold", marginBottom: 10 },
+  subtitle: { marginBottom: 40, color: "#5a6b85" },
+  googleBtn: {
+    backgroundColor: "#7a5aad",
+    padding: 14, borderRadius: 10,
+    width: 250, alignItems: "center", marginBottom: 15,
   },
-  subtitle:{
-    marginBottom:40,
-    color:"#5a6b85"
+  phoneBtn: {
+    backgroundColor: "#10b981",
+    padding: 14, borderRadius: 10,
+    width: 250, alignItems: "center",
   },
-  googleBtn:{
-    backgroundColor:"#7a5aad",
-    padding:14,
-    borderRadius:10,
-    width:250,
-    alignItems:"center",
-    marginBottom:15
+  btnText:    { color: "white", fontWeight: "600" },
+  errorText:  { color: "#e05c5c", marginTop: 10, fontSize: 13, textAlign: "center", paddingHorizontal: 20 },
+  otpContainer: { marginTop: 20, alignItems: "center" },
+  input: {
+    backgroundColor: "white", width: 250,
+    padding: 12, borderRadius: 8,
+    marginBottom: 10, borderWidth: 1, borderColor: "#ddd",
   },
-  phoneBtn:{
-    backgroundColor:"#10b981",
-    padding:14,
-    borderRadius:10,
-    width:250,
-    alignItems:"center"
-  },
-  btnText:{
-    color:"white",
-    fontWeight:"600"
-  },
-  otpContainer:{
-    marginTop:20,
-    alignItems:"center"
-  },
-  input:{
-    backgroundColor:"white",
-    width:250,
-    padding:12,
-    borderRadius:8,
-    marginBottom:10,
-    borderWidth:1,
-    borderColor:"#ddd"
-  }
 });
